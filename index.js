@@ -30,7 +30,7 @@ function getParameterDefinitions() {
     {
       name: 'letteredSlotsPerRow',
       type: 'int',
-      caption: 'Small slots per row',
+      caption: 'Lettered slots per row',
       initial: 13,
     },
     {
