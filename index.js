@@ -39,13 +39,19 @@ function getParameterDefinitions() {
       name: 'sideColumnRows',
       type: 'int',
       caption: 'Total rows in side columns',
-      initial: 3
+      initial: 3,
     },
     {
       name: 'sideColumnSplitRows',
       type: 'int',
       caption: 'Split rows in side columns',
       initial: 1,
+    },
+    {
+      name: 'necklaceRows',
+      type: 'int',
+      caption: 'Necklace rows',
+      initial: 5,
     },
   ];
 }
@@ -55,6 +61,7 @@ const outerBorderThickness = 6;
 const LETTERED_SLOT_HEIGHT_FRACTION = 0.375; // 3/8 of the vertical space
 const SPACE_BETWEEN_SLOTS = 3;
 const SIDE_COLUMN_WIDTH_FRACTION = 0.2;
+const NECKLACE_ROW_HEIGHT = 5;
 
 function inchesToMM(inches) {
   return inches * 25.4;
@@ -68,6 +75,7 @@ function main(params) {
     letteredSlotsPerRow,
     sideColumnRows,
     sideColumnSplitRows,
+    necklaceRows,
   } = params;
   const width = inchesToMM(widthInches);
   const height = inchesToMM(heightInches);
@@ -86,6 +94,18 @@ function main(params) {
     height -
     (outerBorderThickness * 2 + (letteredSlotContainerH + SPACE_BETWEEN_SLOTS));
   const bottomColumnsY = -height + outerBorderThickness + bottomColumnsH;
+
+  const centerColumnW =
+    width -
+    (outerBorderThickness * 2 +
+      sideColumnContainerW * 2 +
+      SPACE_BETWEEN_SLOTS * 2);
+  const centerColumnX =
+    outerBorderThickness + sideColumnContainerW + SPACE_BETWEEN_SLOTS;
+
+  const remainderH =
+    bottomColumnsH - (NECKLACE_ROW_HEIGHT + SPACE_BETWEEN_SLOTS) * necklaceRows;
+  const remainderY = -height + outerBorderThickness + remainderH;
 
   return [
     // Reset the coordinates back to the center
@@ -125,6 +145,20 @@ function main(params) {
             sideColumnSplitRows,
             width - outerBorderThickness - sideColumnContainerW,
             bottomColumnsY
+          ),
+          makeNecklaceRows(
+            necklaceRows,
+            centerColumnW,
+            thickness,
+            centerColumnX,
+            bottomColumnsY
+          ),
+          makeRectangleSlot(
+            centerColumnW,
+            remainderH,
+            centerColumnX,
+            remainderY,
+            thickness
           )
         )
       )
@@ -133,6 +167,20 @@ function main(params) {
 }
 
 module.exports = { main, getParameterDefinitions };
+
+function makeNecklaceRows(count, width, thickness, x, y) {
+  let offsetY = y;
+
+  const necklaceRows = [];
+  for (let i = 0; i < count; i++) {
+    necklaceRows.push(
+      makeRectangleSlot(width, NECKLACE_ROW_HEIGHT, x, offsetY, thickness)
+    );
+    offsetY -= SPACE_BETWEEN_SLOTS + NECKLACE_ROW_HEIGHT;
+  }
+
+  return necklaceRows;
+}
 
 function makeSideColumn(width, height, thickness, rows, splitRows, x, y) {
   const splitSlotWidth = (width - SPACE_BETWEEN_SLOTS) / 2;
