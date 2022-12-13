@@ -5,9 +5,7 @@ const { extrudeLinear, extrudeRectangular } = jscad.extrusions;
 const { geom2, path2 } = jscad.geometries;
 const { arc, cuboid, line, roundedRectangle } = jscad.primitives;
 const { vectorText } = jscad.text;
-const { rotate, rotateY, rotateZ, translate, translateX, translateZ } =
-  jscad.transforms;
-const { degToRad } = jscad.utils;
+const { translate } = jscad.transforms;
 
 function getParameterDefinitions() {
   return [
@@ -94,7 +92,10 @@ function main(params) {
     height -
     (outerBorderThickness * 2 + (letteredSlotContainerH + SPACE_BETWEEN_SLOTS));
   const bottomColumnsY = -height + outerBorderThickness + bottomColumnsH;
-  const sideColumnSplitRows = Math.min(sideColumnSplitRowsParam, sideColumnRows);
+  const sideColumnSplitRows = Math.min(
+    sideColumnSplitRowsParam,
+    sideColumnRows
+  );
 
   const centerColumnW =
     width -
