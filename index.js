@@ -1,10 +1,10 @@
 const jscad = require('@jscad/modeling');
-const { subtract, union } = jscad.booleans;
+const { subtract } = jscad.booleans;
 const { colorize, colorNameToRgb } = jscad.colors;
 const { extrudeLinear, extrudeRectangular } = jscad.extrusions;
 const { geom2, path2 } = jscad.geometries;
-const { arc, cube, cuboid, cylinder, line, triangle } = jscad.primitives;
-const { vectorChar, vectorText } = jscad.text;
+const { arc, cuboid, line, roundedRectangle } = jscad.primitives;
+const { vectorText } = jscad.text;
 const { rotate, rotateY, rotateZ, translate, translateX, translateZ } =
   jscad.transforms;
 const { degToRad } = jscad.utils;
@@ -30,17 +30,31 @@ function getParameterDefinitions() {
       initial: 1,
     },
     {
-      name: 'slotsPerRow',
+      name: 'letteredSlotsPerRow',
       type: 'int',
       caption: 'Small slots per row',
       initial: 13,
+    },
+    {
+      name: 'sideColumnRows',
+      type: 'int',
+      caption: 'Total rows in side columns',
+      initial: 3
+    },
+    {
+      name: 'sideColumnSplitRows',
+      type: 'int',
+      caption: 'Split rows in side columns',
+      initial: 1,
     },
   ];
 }
 
 const outerBorderThickness = 6;
 
-const BEAD_SLOT_H_FRACTION = 0.375; // 3/8 of the vertical space
+const LETTERED_SLOT_HEIGHT_FRACTION = 0.375; // 3/8 of the vertical space
+const SPACE_BETWEEN_SLOTS = 3;
+const SIDE_COLUMN_WIDTH_FRACTION = 0.2;
 
 function inchesToMM(inches) {
   return inches * 25.4;
@@ -51,7 +65,9 @@ function main(params) {
     width: widthInches,
     height: heightInches,
     thickness,
-    slotsPerRow,
+    letteredSlotsPerRow,
+    sideColumnRows,
+    sideColumnSplitRows,
   } = params;
   const width = inchesToMM(widthInches);
   const height = inchesToMM(heightInches);
@@ -59,9 +75,17 @@ function main(params) {
   const halfWidth = width / 2;
   const halfHeight = height / 2;
 
-  const beadSlotContainerW = width - outerBorderThickness * 2;
-  const beadSlotContainerH =
-    BEAD_SLOT_H_FRACTION * (height - outerBorderThickness * 2);
+  const letteredSlotContainerW = width - outerBorderThickness * 2;
+  const letteredSlotContainerH =
+    LETTERED_SLOT_HEIGHT_FRACTION * (height - outerBorderThickness * 2);
+
+  const sideColumnContainerW =
+    (width - (outerBorderThickness * 2 + SPACE_BETWEEN_SLOTS * 2)) *
+    SIDE_COLUMN_WIDTH_FRACTION;
+  const bottomColumnsH =
+    height -
+    (outerBorderThickness * 2 + (letteredSlotContainerH + SPACE_BETWEEN_SLOTS));
+  const bottomColumnsY = -height + outerBorderThickness + bottomColumnsH;
 
   return [
     // Reset the coordinates back to the center
@@ -78,11 +102,29 @@ function main(params) {
 
             cuboid({ size: [width, height, thickness] })
           ),
-          makeBeadSlots(
-            slotsPerRow,
-            beadSlotContainerW,
-            beadSlotContainerH,
+          makeLetteredSlots(
+            letteredSlotsPerRow,
+            letteredSlotContainerW,
+            letteredSlotContainerH,
             thickness
+          ),
+          makeSideColumn(
+            sideColumnContainerW,
+            bottomColumnsH,
+            thickness,
+            sideColumnRows,
+            sideColumnSplitRows,
+            outerBorderThickness,
+            bottomColumnsY
+          ),
+          makeSideColumn(
+            sideColumnContainerW,
+            bottomColumnsH,
+            thickness,
+            sideColumnRows,
+            sideColumnSplitRows,
+            width - outerBorderThickness - sideColumnContainerW,
+            bottomColumnsY
           )
         )
       )
@@ -92,21 +134,64 @@ function main(params) {
 
 module.exports = { main, getParameterDefinitions };
 
-function makeBeadSlots(countPerRow, width, height, thickness) {
-  const SPACE_BETWEEN_SLOTS = 5;
+function makeSideColumn(width, height, thickness, rows, splitRows, x, y) {
+  const splitSlotWidth = (width - SPACE_BETWEEN_SLOTS) / 2;
+  const fullSlotWidth = width;
+  const slotHeight = (height - SPACE_BETWEEN_SLOTS * (rows - 1)) / rows;
+  const offsetX = x;
+  let offsetY = y;
+
+  const sideColumn = [];
+  for (let i = 0; i < splitRows; i++) {
+    sideColumn.push(
+      makeRectangleSlot(splitSlotWidth, slotHeight, offsetX, offsetY, thickness)
+    );
+    sideColumn.push(
+      makeRectangleSlot(
+        splitSlotWidth,
+        slotHeight,
+        offsetX + splitSlotWidth + SPACE_BETWEEN_SLOTS,
+        offsetY,
+        thickness
+      )
+    );
+    offsetY -= slotHeight + SPACE_BETWEEN_SLOTS;
+  }
+  for (let i = 0; i < rows - splitRows; i++) {
+    sideColumn.push(
+      makeRectangleSlot(fullSlotWidth, slotHeight, offsetX, offsetY, thickness)
+    );
+    offsetY -= slotHeight + SPACE_BETWEEN_SLOTS;
+  }
+
+  return sideColumn;
+}
+
+function makeRectangleSlot(width, height, offsetX, offsetY, thickness) {
+  return extrudeLinear(
+    { height: thickness },
+    roundedRectangle({
+      size: [width, height],
+      roundRadius: 2,
+      center: [offsetX + width / 2, offsetY - height / 2],
+    })
+  );
+}
+
+function makeLetteredSlots(countPerRow, width, height, thickness) {
   const innerBordersWidth = (countPerRow - 1) * SPACE_BETWEEN_SLOTS;
   const slotWidth = (width - innerBordersWidth) / countPerRow;
   const slotHeight = (height - SPACE_BETWEEN_SLOTS) / 2;
   let offsetX = outerBorderThickness;
   let offsetY = -outerBorderThickness;
 
-  const beadSlots = [];
+  const letteredSlots = [];
   for (let i = 0; i < countPerRow; i++) {
-    beadSlots.push(
-      makeBeadSlot(slotWidth, slotHeight, thickness, offsetX, offsetY)
+    letteredSlots.push(
+      makeLetteredSlot(slotWidth, slotHeight, thickness, offsetX, offsetY)
     );
-    beadSlots.push(
-      makeBeadSlotLabel(i, slotHeight / 9, thickness, offsetX, offsetY)
+    letteredSlots.push(
+      makeLetteredSlotLabel(i, slotHeight / 9, thickness, offsetX, offsetY)
     );
 
     offsetX += slotWidth + SPACE_BETWEEN_SLOTS;
@@ -114,11 +199,11 @@ function makeBeadSlots(countPerRow, width, height, thickness) {
   offsetX = outerBorderThickness;
   offsetY -= slotHeight + SPACE_BETWEEN_SLOTS;
   for (let i = 0; i < countPerRow; i++) {
-    beadSlots.push(
-      makeBeadSlot(slotWidth, slotHeight, thickness, offsetX, offsetY)
+    letteredSlots.push(
+      makeLetteredSlot(slotWidth, slotHeight, thickness, offsetX, offsetY)
     );
-    beadSlots.push(
-      makeBeadSlotLabel(
+    letteredSlots.push(
+      makeLetteredSlotLabel(
         i + countPerRow,
         slotHeight / 9,
         thickness,
@@ -130,10 +215,10 @@ function makeBeadSlots(countPerRow, width, height, thickness) {
     offsetX += slotWidth + SPACE_BETWEEN_SLOTS;
   }
 
-  return beadSlots;
+  return letteredSlots;
 }
 
-function makeBeadSlotLabel(index, height, thickness, offsetX, offsetY) {
+function makeLetteredSlotLabel(index, height, thickness, offsetX, offsetY) {
   const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const letter = ALPHABET[index % ALPHABET.length];
 
@@ -159,14 +244,14 @@ function makeBeadSlotLabel(index, height, thickness, offsetX, offsetY) {
   );
 }
 
-function makeBeadSlot(width, height, thickness, offsetX, offsetY) {
+function makeLetteredSlot(width, height, thickness, offsetX, offsetY) {
   return extrudeLinear(
     { height: thickness },
-    drawBeadSlot(width, height, offsetX, offsetY)
+    drawLetteredSlot(width, height, offsetX, offsetY)
   );
 }
 
-function drawBeadSlot(width, height, offsetX, offsetY) {
+function drawLetteredSlot(width, height, offsetX, offsetY) {
   const cornerRadius = 2;
   const xL = offsetX;
   const xR = offsetX + width;
@@ -246,36 +331,3 @@ function drawBeadSlot(width, height, offsetX, offsetY) {
     )
   );
 }
-
-// function makeLeg(length, width, holeDiameter) {
-//   const leg = cuboid({ size: [length, width, width] });
-//
-//   const hole = rotateY(
-//     degToRad(90),
-//     cylinder({
-//       height: length,
-//       radius: holeDiameter / 2,
-//     })
-//   );
-//
-//   return translate(
-//     [length / 2 + width, width / 2, width / 2],
-//     subtract(leg, hole)
-//   );
-// }
-//
-// function makeBrace(braceLength, braceWidth) {
-//   return translateZ(
-//     braceLength,
-//     rotate(
-//       [degToRad(90), degToRad(90), 0],
-//       extrudeLinear(
-//         { height: braceWidth },
-//         triangle({
-//           type: 'SAS',
-//           values: [braceLength, degToRad(90), braceLength],
-//         })
-//       )
-//     )
-//   );
-// }
