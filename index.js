@@ -42,13 +42,13 @@ function getParameterDefinitions() {
       initial: 3,
     },
     {
-      name: 'sideColumnSplitRows',
+      name: 'sideColumnSplitRowsParam',
       type: 'int',
       caption: 'Split rows in side columns',
       initial: 1,
     },
     {
-      name: 'necklaceRows',
+      name: 'necklaceRowsParam',
       type: 'int',
       caption: 'Necklace rows',
       initial: 5,
@@ -74,8 +74,8 @@ function main(params) {
     thickness,
     letteredSlotsPerRow,
     sideColumnRows,
-    sideColumnSplitRows,
-    necklaceRows,
+    sideColumnSplitRowsParam,
+    necklaceRowsParam,
   } = params;
   const width = inchesToMM(widthInches);
   const height = inchesToMM(heightInches);
@@ -94,6 +94,7 @@ function main(params) {
     height -
     (outerBorderThickness * 2 + (letteredSlotContainerH + SPACE_BETWEEN_SLOTS));
   const bottomColumnsY = -height + outerBorderThickness + bottomColumnsH;
+  const sideColumnSplitRows = Math.min(sideColumnSplitRowsParam, sideColumnRows);
 
   const centerColumnW =
     width -
@@ -102,6 +103,11 @@ function main(params) {
       SPACE_BETWEEN_SLOTS * 2);
   const centerColumnX =
     outerBorderThickness + sideColumnContainerW + SPACE_BETWEEN_SLOTS;
+
+  const maxNecklaceRows = Math.floor(
+    bottomColumnsH / (NECKLACE_ROW_HEIGHT + SPACE_BETWEEN_SLOTS)
+  );
+  const necklaceRows = Math.min(necklaceRowsParam, maxNecklaceRows);
 
   const remainderH =
     bottomColumnsH - (NECKLACE_ROW_HEIGHT + SPACE_BETWEEN_SLOTS) * necklaceRows;
